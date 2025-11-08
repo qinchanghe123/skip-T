@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>顶流广告技术有限公司</title>
+  <title>顶流广告技术有限公司 · Skip（含导航列）</title>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css" rel="stylesheet" />
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js"></script>
   <style>
@@ -51,6 +51,7 @@
     th { background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); color: #475569; font-size: 12px; letter-spacing: .4px; text-align: left; padding: 10px 8px; }
     td { padding: 12px 8px; border-bottom: 1px dashed #e5e7eb; color: #111827; }
     tr:hover { background: #f9fafb; }
+    .nav-link { white-space: nowrap; text-decoration: none; padding: 8px 10px; border-radius: 10px; background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.35); color: #4338ca; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -73,7 +74,7 @@
             <input id="addressInput" type="text" placeholder="示例：1437 N Jefferson St Milwaukee,WI 53202" />
             <button id="btnSearch" class="search-btn">开始查询</button>
           </div>
-          <div class="feature-note">🎯 Ski定点查询</div>
+          <div class="feature-note"></div>
         </div>
 
         <div class="progress-container" id="progressContainer"><div class="progress-bar" id="progressBar"></div></div>
@@ -91,17 +92,17 @@
 window.addEventListener('error', e => { const el=document.getElementById('error'); el.style.display='block'; el.textContent = '脚本错误：\\n' + (e.error?.stack || e.message); });
 window.addEventListener('unhandledrejection', e => { const el=document.getElementById('error'); el.style.display='block'; el.textContent = '未捕获的 Promise 异常：\\n' + (e.reason?.stack || e.reason); });
 
-/* ========= 配置（可按你账号速率调整） ========= */
+/* ========= 配置（含速率限制） ========= */
 const MAPBOX_TOKEN = 'sk.eyJ1Ijoic2t0a2luZ2VyIiwiYSI6ImNtaHEzZDZ1NjBzcHUycnExN3AyaW8wbGoifQ.My3FBQg53SM2J8P1oAdtfQ';
 const REQUEST_TIMEOUT = 60000;
 
 /* —— 速率限制参数 —— */
-const GEOCODE_QPS = 4;           // 地理编码平均每秒请求数
-const GEOCODE_CONCURRENCY = 4;   // 地理编码并发
-const MATRIX_QPS = 1;            // Matrix 平均每秒请求数（每次最多 24 目的地）
-const MATRIX_CONCURRENCY = 1;    // Matrix 并发
-const MAX_ATTEMPTS = 6;          // 失败重试上限
-const BASE_BACKOFF = 500;        // 指数退避起始(ms)
+const GEOCODE_QPS = 4;
+const GEOCODE_CONCURRENCY = 4;
+const MATRIX_QPS = 1;
+const MATRIX_CONCURRENCY = 1;
+const MAX_ATTEMPTS = 6;
+const BASE_BACKOFF = 500;
 
 const BATCH_SIZE = 25;           // Matrix：1 源 + 最多 24 目的地
 const HISTORY_KEY = 'search_history';
@@ -151,7 +152,7 @@ const m2mi=m=>m/1609.344;
 const fmtDist=m=>Number.isFinite(m)?(m2mi(m)>=100?`${m2mi(m).toFixed(0)} 英里`:`${m2mi(m).toFixed(1)} 英里`):'—';
 const fmtDur=s=>Number.isFinite(s)?`${Math.round(s/60)} 分钟`:'—';
 
-/* ========= 简易限流器（QPS + 并发 + 动态降速） ========= */
+/* ========= 限流器 ========= */
 class Limiter{
   constructor({qps, concurrency}){ this.interval=Math.max(1, Math.floor(1000/qps)); this.concurrency=concurrency; this.queue=[]; this.active=0; this.lastStart=0; }
   schedule(fn){ return new Promise((resolve,reject)=>{ this.queue.push({fn,resolve,reject}); this._drain(); }); }
@@ -165,12 +166,12 @@ class Limiter{
       if(wait>0) setTimeout(run, wait); else run();
     }
   }
-  dampen(){ this.interval = Math.min(2000, Math.round(this.interval * 1.5)); } // 发生429时放慢节奏
+  dampen(){ this.interval = Math.min(2000, Math.round(this.interval * 1.5)); }
 }
 const geocodeLimiter=new Limiter({qps:GEOCODE_QPS, concurrency:GEOCODE_CONCURRENCY});
 const matrixLimiter =new Limiter({qps:MATRIX_QPS,  concurrency:MATRIX_CONCURRENCY});
 
-/* ========= Mapbox Geocoding (v6) ========= */
+/* ========= Geocoding ========= */
 const geocodeCache=new Map();
 function parseRegionCityFromFeature(f){
   const p=f.properties||{}, ctx=p.context; let region='', city='';
@@ -193,9 +194,7 @@ function parseRegionCityFromFeature(f){
   }
   return {regionName:region, cityName:city};
 }
-
-/* —— 带退避/限流的 fetch —— */
-async function mapboxFetch(url, endpoint){ // endpoint: 'geocode' | 'matrix'
+async function mapboxFetch(url, endpoint){
   const limiter = endpoint==='matrix' ? matrixLimiter : geocodeLimiter;
   return limiter.schedule(async ()=>{
     let attempt=0, backoff=BASE_BACKOFF;
@@ -206,8 +205,8 @@ async function mapboxFetch(url, endpoint){ // endpoint: 'geocode' | 'matrix'
         if (resp.status === 429 || resp.status >= 500){
           const ra = resp.headers.get('retry-after');
           const delay = ra ? parseFloat(ra)*1000 : Math.min(30000, backoff * Math.pow(2, attempt-1));
-          limiter.dampen(); // 动态降速
-          await sleep(delay + Math.random()*150); // 抖动
+          limiter.dampen();
+          await sleep(delay + Math.random()*150);
           if (attempt < MAX_ATTEMPTS) continue;
         }
         return resp;
@@ -218,8 +217,6 @@ async function mapboxFetch(url, endpoint){ // endpoint: 'geocode' | 'matrix'
     }
   });
 }
-
-/* —— 前向地理编码（带缓存/限流/退避） —— */
 async function forwardGeocode(q, {types, proximity, country} = {}){
   const key=`${q}|${types||''}|${proximity||''}|${country||''}`;
   if(geocodeCache.has(key)) return geocodeCache.get(key);
@@ -238,7 +235,7 @@ async function forwardGeocode(q, {types, proximity, country} = {}){
   const out={lon,lat,regionName,cityName}; geocodeCache.set(key,out); return out;
 }
 
-/* ========= 防 0 英里：严格 geocode 规则 ========= */
+/* ========= 严格 geocode（防 0 英里） ========= */
 const samePoint=(a,b,eps=1e-5)=>Math.abs(a.lat-b.lat)<eps && Math.abs(a.lon-b.lon)<eps;
 const sameRegion=(a,b)=>{
   const na=norm((a||'').replace(/\./g,'')), nb=norm((b||'').replace(/\./g,''));
@@ -270,7 +267,7 @@ async function geocodeCityStrict(name, stateRaw, origin){
       if(!sameRegion(r.regionName, stateRaw)) continue;
       if(samePoint({lat:r.lat,lon:r.lon}, origin)) continue;
       return {city:name,lon:r.lon,lat:r.lat,ok:true};
-    }catch{/* next try */}
+    }catch{/* next */}
   }
   return {city:name,ok:false};
 }
@@ -296,14 +293,12 @@ async function getCitiesInState(stateRaw){
   if(!stateKey) throw new Error(`未在 skipCities.json 找到州 "${stateRaw}"`);
   let list=data[stateKey];
   if(!Array.isArray(list)||!list.length) throw new Error(`州 "${stateKey}" 未定义任何支持城市`);
-  // 去重（避免重复请求同一城市）
   const seen=new Set(); list=list.filter(n=>{const k=norm(n); if(seen.has(k)) return false; seen.add(k); return true;});
   return {stateKey,cities:list};
 }
 async function geocodeCities(cities, stateRaw, originLon, originLat){
   const origin={lon:originLon,lat:originLat};
   const tasks=cities.map(name=>async()=>geocodeCityStrict(name, stateRaw, origin));
-  // 使用 geocodeLimiter 的内部节流，外部仍做轻量并发控制以利进度
   const out=[]; let i=0,active=0,done=0; const MAX_OUTER_CONC=Math.min(GEOCODE_CONCURRENCY*2, 10);
   return new Promise(resolve=>{
     function next(){
@@ -351,7 +346,7 @@ function runPool(tasks,limit,onProgress){
   });
 }
 
-/* ========= 查询主流程（无“导航”列） ========= */
+/* ========= 查询主流程（导航列已恢复） ========= */
 searchButton.onclick = async function(){
   errorEl.textContent=''; errorEl.style.display='none';
   resultsEl.innerHTML=''; loadingEl.style.display='block';
@@ -382,10 +377,25 @@ searchButton.onclick = async function(){
       const p=Math.round(f/t*100); progressBar.style.width=p+'%'; progressText.textContent=`阶段 2：批量计算距离/时间… ${p}%`;
     });
 
-    // 5) 排序并渲染（英里/分钟）
+    // 5) 排序并渲染（英里/分钟 + 导航列）
     results.sort((a,b)=>a.distanceVal-b.distanceVal);
-    const rows=results.map(r=>`<tr><td><strong>${r.city}</strong></td><td>${r.distance}</td><td>${r.duration}</td></tr>`).join('');
-    resultsEl.innerHTML=`<table><thead><tr><th>🏙️ 城市</th><th>📏 距离（英里）</th><th>⏱️ 驾车时间（分钟）</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+    const o=`${origin.lat},${origin.lon}`;
+    const rows=results.map(r=>{
+      const d=`${r.lat},${r.lon}`;
+      const nav=`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(o)}&destination=${encodeURIComponent(d)}`;
+      return `<tr>
+        <td><strong>${r.city}</strong></td>
+        <td>${r.distance}</td>
+        <td>${r.duration}</td>
+        <td><a class="nav-link" target="_blank" rel="noopener" href="${nav}">📍 导航</a></td>
+      </tr>`;
+    }).join('');
+
+    resultsEl.innerHTML=`<table>
+      <thead><tr><th>🏙️ 城市</th><th>📏 距离（英里）</th><th>⏱️ 时间（分钟）</th><th>🚗</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 
     loadingEl.textContent='计算完成'; setTimeout(()=>{loadingEl.style.display='none';},1500);
     progressText.textContent='✅ 完成';
