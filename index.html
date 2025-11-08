@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>顶流广告技术有限公司</title>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh; padding: 20px; color: #111827;
+    }
+    .main-wrapper { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
+    .container { background: rgba(255,255,255,.95); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.12); overflow: hidden; }
+    .header { padding: 26px 26px 10px; background: linear-gradient(135deg,#fff 0%,#f8fafc 100%); border-bottom: 1px solid #eef2f7; }
+    .header h1 { font-size: 22px; font-weight: 800; color: #1f2937; letter-spacing: .5px; text-align: center; }
+    .subtitle { margin-top: 8px; color: #64748b; font-size: 14px; text-align: center; }
+    .content { padding: 22px 24px 26px; }
+    .sidebar { background: rgba(255,255,255,.95); border-radius: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.12); padding: 18px; height: fit-content; position: sticky; top: 20px; }
+    .sidebar h3 { color: #374151; font-size: 16px; font-weight: 800; margin-bottom: 14px; text-align: center; padding-bottom: 10px; border-bottom: 2px solid #eef2f7; }
+    .history-list { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; max-height: 360px; overflow: auto; padding-right: 6px; }
+    .history-list::-webkit-scrollbar { width: 8px; } .history-list::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+    .history-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer; transition: all .2s ease; }
+    .history-item:hover { background: #fff; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.06); }
+    .history-address { color: #111827; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+    .history-delete { color: #6b7280; cursor: pointer; font-size: 12px; padding: 0 6px; border-radius: 6px; border: 1px solid #d1d5db; }
+    .history-delete:hover { color: #ef4444; border-color: #ef4444; }
+    .empty-history { color: #9ca3af; text-align: center; font-size: 13px; }
+    .clear-history { width: 100%; padding: 10px 0; border-radius: 10px; background: linear-gradient(135deg,#fef3c7 0%,#fde68a 100%); border: 1px solid #f59e0b; color: #78350f; font-weight: 700; cursor: pointer; margin-top: 6px; }
+
+    .input-section { margin-bottom: 16px; }
+    .input-group { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
+    #addressInput { width: 100%; padding: 14px 14px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; outline: none; font-size: 14px; color: #111827; transition: all .2s ease; }
+    #addressInput:focus { border-color: #60a5fa; box-shadow: 0 0 0 4px rgba(59,130,246,.15); }
+    .search-btn { padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(59,130,246,.55); color: white; background: linear-gradient(135deg,#60a5fa 0%,#3b82f6 100%); font-weight: 800; cursor: pointer; }
+
+    .feature-note { color: #6b7280; font-size: 14px; text-align: center; margin-top: 12px; padding: 10px; background: rgba(107,114,128,.08); border-radius: 8px; border-left: 4px solid #3b82f6; }
+
+    .progress-container { margin: 12px 0 6px; height: 10px; width: 100%; background: #f3f4f6; border-radius: 999px; overflow: hidden; display: none; }
+    .progress-bar { width: 0%; height: 100%; background: linear-gradient(135deg,#34d399 0%,#10b981 100%); transition: width .25s ease; }
+    .progress-text { color: #6b7280; font-size: 13px; margin-bottom: 4px; }
+
+    .loading { display: none; margin: 8px 0 10px; color: #111827; background: #e3f2fd; border-left: 4px solid #3b82f6; padding: 10px 12px; border-radius: 10px; font-weight: 700; }
+    .error { display: none; background: #fee2e2; color: #dc2626; padding: 12px 14px; border-radius: 10px; border: 1px solid #fecaca; margin-top: 10px; white-space: pre-wrap; }
+
+    .results { margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,.06); }
+    th { background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); color: #475569; font-size: 12px; letter-spacing: .4px; text-align: left; padding: 10px 8px; }
+    td { padding: 12px 8px; border-bottom: 1px dashed #e5e7eb; color: #111827; }
+    tr:hover { background: #f9fafb; }
+  </style>
+</head>
+<body>
+  <div class="main-wrapper">
+    <div class="sidebar">
+      <h3>📋 查询历史</h3>
+      <ul id="historyList" class="history-list"><li class="empty-history">暂无查询记录</li></ul>
+      <button id="clearHistory" class="clear-history" style="display:none;">🗑️ 清空历史</button>
+    </div>
+
+    <div class="container">
+      <div class="header">
+        <h1>顶流广告技术有限公司</h1>
+        <div class="subtitle">🎯 Ski定点查询</div>
+      </div>
+
+      <div class="content">
+        <div class="input-section">
+          <div class="input-group">
+            <input id="addressInput" type="text" placeholder="示例：1437 N Jefferson St Milwaukee,WI 53202" />
+            <button id="btnSearch" class="search-btn">开始查询</button>
+          </div>
+          <div class="feature-note">🎯 Ski定点查询</div>
+        </div>
+
+        <div class="progress-container" id="progressContainer"><div class="progress-bar" id="progressBar"></div></div>
+        <div class="progress-text" id="progressText"></div>
+
+        <div id="loading" class="loading" style="display:none;">正在智能计算中</div>
+        <div id="error" class="error"></div>
+        <div id="results" class="results"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ========= 全局错误提示 ========= */
+window.addEventListener('error', e => { const el=document.getElementById('error'); el.style.display='block'; el.textContent = '脚本错误：\\n' + (e.error?.stack || e.message); });
+window.addEventListener('unhandledrejection', e => { const el=document.getElementById('error'); el.style.display='block'; el.textContent = '未捕获的 Promise 异常：\\n' + (e.reason?.stack || e.reason); });
+
+/* ========= 配置（可按你账号速率调整） ========= */
+const MAPBOX_TOKEN = 'sk.eyJ1Ijoic2t0a2luZ2VyIiwiYSI6ImNtaHEzZDZ1NjBzcHUycnExN3AyaW8wbGoifQ.My3FBQg53SM2J8P1oAdtfQ';
+const REQUEST_TIMEOUT = 60000;
+
+/* —— 速率限制参数 —— */
+const GEOCODE_QPS = 4;           // 地理编码平均每秒请求数
+const GEOCODE_CONCURRENCY = 4;   // 地理编码并发
+const MATRIX_QPS = 1;            // Matrix 平均每秒请求数（每次最多 24 目的地）
+const MATRIX_CONCURRENCY = 1;    // Matrix 并发
+const MAX_ATTEMPTS = 6;          // 失败重试上限
+const BASE_BACKOFF = 500;        // 指数退避起始(ms)
+
+const BATCH_SIZE = 25;           // Matrix：1 源 + 最多 24 目的地
+const HISTORY_KEY = 'search_history';
+const MAX_HISTORY = 10;
+
+/* ========= DOM ========= */
+const searchButton = document.getElementById('btnSearch');
+const loadingEl = document.getElementById('loading');
+const errorEl = document.getElementById('error');
+const resultsEl = document.getElementById('results');
+const progressContainer = document.getElementById('progressContainer');
+const progressBar = document.getElementById('progressBar');
+const progressText = document.getElementById('progressText');
+
+/* ========= 历史记录 ========= */
+class SearchHistory{
+  constructor(){ this.history=this.load(); this.render(); }
+  load(){ try{const s=localStorage.getItem(HISTORY_KEY); return s?JSON.parse(s):[];}catch{return[];} }
+  save(){ try{localStorage.setItem(HISTORY_KEY, JSON.stringify(this.history));}catch{} }
+  add(addr){ if(!addr?.trim())return; this.history=this.history.filter(x=>x!==addr); this.history.unshift(addr); if(this.history.length>MAX_HISTORY) this.history=this.history.slice(0,MAX_HISTORY); this.save(); this.render(); }
+  remove(addr){ this.history=this.history.filter(x=>x!==addr); this.save(); this.render(); }
+  clear(){ this.history=[]; this.save(); this.render(); }
+  render(){
+    const list=document.getElementById('historyList'); const btn=document.getElementById('clearHistory');
+    if(!this.history.length){ list.innerHTML='<li class="empty-history">暂无查询记录</li>'; btn.style.display='none'; }
+    else{
+      btn.style.display='block';
+      list.innerHTML=this.history.map(a=>`
+        <li class="history-item" onclick="hist.pick('${a.replace(/'/g,"\\'")}')">
+          <span class="history-address" title="${a}">${a}</span>
+          <span class="history-delete" onclick="event.stopPropagation();hist.remove('${a.replace(/'/g,"\\'")}')">✕</span>
+        </li>`).join('');
+    }
+  }
+  pick(addr){ document.getElementById('addressInput').value=addr; searchButton.click(); }
+}
+const hist=new SearchHistory();
+document.getElementById('clearHistory').onclick=()=>{ if(confirm('确定清空历史？')) hist.clear(); };
+
+/* ========= 工具 ========= */
+const withTimeout=(p,t)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('API服务响应超时')),t))]);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const chunk=(arr,size)=>{const out=[];for(let i=0;i<arr.length;i+=size)out.push(arr.slice(i,i+size));return out;};
+const norm=s=>(s||'').toLowerCase().replace(/[\s._-]+/g,' ').trim();
+const title=s=>(s||'').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
+const m2mi=m=>m/1609.344;
+const fmtDist=m=>Number.isFinite(m)?(m2mi(m)>=100?`${m2mi(m).toFixed(0)} 英里`:`${m2mi(m).toFixed(1)} 英里`):'—';
+const fmtDur=s=>Number.isFinite(s)?`${Math.round(s/60)} 分钟`:'—';
+
+/* ========= 简易限流器（QPS + 并发 + 动态降速） ========= */
+class Limiter{
+  constructor({qps, concurrency}){ this.interval=Math.max(1, Math.floor(1000/qps)); this.concurrency=concurrency; this.queue=[]; this.active=0; this.lastStart=0; }
+  schedule(fn){ return new Promise((resolve,reject)=>{ this.queue.push({fn,resolve,reject}); this._drain(); }); }
+  _drain(){
+    while(this.active<this.concurrency && this.queue.length){
+      const job=this.queue.shift(); const now=Date.now(); const wait=Math.max(0, this.interval - (now - this.lastStart));
+      const run=()=>{ this.active++; this.lastStart=Date.now();
+        Promise.resolve().then(job.fn).then(res=>{ this.active--; job.resolve(res); this._drain(); })
+          .catch(err=>{ this.active--; job.reject(err); this._drain(); });
+      };
+      if(wait>0) setTimeout(run, wait); else run();
+    }
+  }
+  dampen(){ this.interval = Math.min(2000, Math.round(this.interval * 1.5)); } // 发生429时放慢节奏
+}
+const geocodeLimiter=new Limiter({qps:GEOCODE_QPS, concurrency:GEOCODE_CONCURRENCY});
+const matrixLimiter =new Limiter({qps:MATRIX_QPS,  concurrency:MATRIX_CONCURRENCY});
+
+/* ========= Mapbox Geocoding (v6) ========= */
+const geocodeCache=new Map();
+function parseRegionCityFromFeature(f){
+  const p=f.properties||{}, ctx=p.context; let region='', city='';
+  if(Array.isArray(ctx)){
+    for(const c of ctx){ const id=c.id||'';
+      if(id.startsWith('region')) region=c.name||region;
+      if(id.startsWith('place')) city=c.name||city;
+      if(!city&&(id.startsWith('locality')||id.startsWith('district')||id.startsWith('neighborhood'))) city=c.name||city;
+    }
+  }else if(ctx&&typeof ctx==='object'){
+    const pick=v=>Array.isArray(v)?v[0]:v;
+    const R=pick(ctx.region), P=pick(ctx.place), L=pick(ctx.locality), D=pick(ctx.district), N=pick(ctx.neighborhood);
+    region=R?.name||region; city=P?.name||L?.name||D?.name||N?.name||city;
+  }
+  if(!region||!city){
+    const s=p.place_formatted||p.full_address||f.place_name||'';
+    const a=s.split(',').map(x=>x.trim());
+    if(!city&&a.length) city=a[0];
+    if(!region&&a.length>=2) region=a[a.length-2];
+  }
+  return {regionName:region, cityName:city};
+}
+
+/* —— 带退避/限流的 fetch —— */
+async function mapboxFetch(url, endpoint){ // endpoint: 'geocode' | 'matrix'
+  const limiter = endpoint==='matrix' ? matrixLimiter : geocodeLimiter;
+  return limiter.schedule(async ()=>{
+    let attempt=0, backoff=BASE_BACKOFF;
+    while(true){
+      attempt++;
+      try{
+        const resp = await withTimeout(fetch(url), REQUEST_TIMEOUT);
+        if (resp.status === 429 || resp.status >= 500){
+          const ra = resp.headers.get('retry-after');
+          const delay = ra ? parseFloat(ra)*1000 : Math.min(30000, backoff * Math.pow(2, attempt-1));
+          limiter.dampen(); // 动态降速
+          await sleep(delay + Math.random()*150); // 抖动
+          if (attempt < MAX_ATTEMPTS) continue;
+        }
+        return resp;
+      }catch(err){
+        if (attempt >= MAX_ATTEMPTS) throw err;
+        await sleep(Math.min(30000, backoff * Math.pow(2, attempt-1)) + Math.random()*150);
+      }
+    }
+  });
+}
+
+/* —— 前向地理编码（带缓存/限流/退避） —— */
+async function forwardGeocode(q, {types, proximity, country} = {}){
+  const key=`${q}|${types||''}|${proximity||''}|${country||''}`;
+  if(geocodeCache.has(key)) return geocodeCache.get(key);
+  const url=new URL('https://api.mapbox.com/search/geocode/v6/forward');
+  url.searchParams.set('q',q); url.searchParams.set('limit','1');
+  if(types) url.searchParams.set('types',types);
+  if(proximity) url.searchParams.set('proximity',proximity);
+  if(country) url.searchParams.set('country',country);
+  url.searchParams.set('access_token',MAPBOX_TOKEN);
+  const res=await mapboxFetch(url.toString(),'geocode');
+  if(!res.ok) throw new Error('地址解析失败');
+  const data=await res.json(); const f=data?.features?.[0];
+  if(!f?.geometry?.coordinates) throw new Error('未能解析经纬度');
+  const [lon,lat]=f.geometry.coordinates;
+  const {regionName,cityName}=parseRegionCityFromFeature(f);
+  const out={lon,lat,regionName,cityName}; geocodeCache.set(key,out); return out;
+}
+
+/* ========= 防 0 英里：严格 geocode 规则 ========= */
+const samePoint=(a,b,eps=1e-5)=>Math.abs(a.lat-b.lat)<eps && Math.abs(a.lon-b.lon)<eps;
+const sameRegion=(a,b)=>{
+  const na=norm((a||'').replace(/\./g,'')), nb=norm((b||'').replace(/\./g,''));
+  if(!na||!nb) return true;
+  if(na===nb) return true;
+  const abbr={
+    'alabama':'al','alaska':'ak','arizona':'az','arkansas':'ar','california':'ca','colorado':'co','connecticut':'ct',
+    'delaware':'de','florida':'fl','georgia':'ga','hawaii':'hi','idaho':'id','illinois':'il','indiana':'in','iowa':'ia',
+    'kansas':'ks','kentucky':'ky','louisiana':'la','maine':'me','maryland':'md','massachusetts':'ma','michigan':'mi',
+    'minnesota':'mn','mississippi':'ms','missouri':'mo','montana':'mt','nebraska':'ne','nevada':'nv','new hampshire':'nh',
+    'new jersey':'nj','new mexico':'nm','new york':'ny','north carolina':'nc','north dakota':'nd','ohio':'oh',
+    'oklahoma':'ok','oregon':'or','pennsylvania':'pa','rhode island':'ri','south carolina':'sc','south dakota':'sd',
+    'tennessee':'tn','texas':'tx','utah':'ut','vermont':'vt','virginia':'va','washington':'wa','west virginia':'wv',
+    'wisconsin':'wi','wyoming':'wy','district of columbia':'dc'
+  };
+  const expand=s=>abbr[s]||Object.keys(abbr).find(k=>abbr[k]===s)||s;
+  return expand(na)===expand(nb);
+};
+async function geocodeCityStrict(name, stateRaw, origin){
+  const tries=[
+    { types:'place,locality', proximity:`${origin.lon},${origin.lat}`, country:'US' },
+    { types:'place,locality', proximity:undefined,                     country:'US' },
+    { types:'place,locality', proximity:undefined,                     country:'US', suffix:', USA' }
+  ];
+  for(const t of tries){
+    try{
+      const q=`${name}, ${stateRaw}${t.suffix||''}`;
+      const r=await forwardGeocode(q,{types:t.types, proximity:t.proximity, country:t.country});
+      if(!sameRegion(r.regionName, stateRaw)) continue;
+      if(samePoint({lat:r.lat,lon:r.lon}, origin)) continue;
+      return {city:name,lon:r.lon,lat:r.lat,ok:true};
+    }catch{/* next try */}
+  }
+  return {city:name,ok:false};
+}
+
+/* ========= 仅用 skipCities.json（州 → 城市列表） ========= */
+function findStateKeyInsensitive(obj, stateRaw){
+  const want=norm(stateRaw), keys=Object.keys(obj||{});
+  for(const k of keys) if(norm(k)===want) return k;
+  for(const k of keys){ const nk=norm(k); if(nk.includes(want)||want.includes(nk)) return k; }
+  const t=title(want); for(const k of keys) if(title(norm(k))===t) return k;
+  const slug=want.replace(/\s+/g,'-'); for(const k of keys) if(norm(k)===slug) return k;
+  return null;
+}
+async function geocodeAddress(address){
+  const {lon,lat,regionName}=await forwardGeocode(address,{types:'address,place,locality', country:'US'});
+  return {lon,lat,stateRaw:regionName};
+}
+async function getCitiesInState(stateRaw){
+  const resp=await withTimeout(fetch('skipCities.json'),REQUEST_TIMEOUT);
+  if(!resp.ok) throw new Error('skipCities.json 加载失败');
+  const data=await resp.json();
+  const stateKey=findStateKeyInsensitive(data, stateRaw);
+  if(!stateKey) throw new Error(`未在 skipCities.json 找到州 "${stateRaw}"`);
+  let list=data[stateKey];
+  if(!Array.isArray(list)||!list.length) throw new Error(`州 "${stateKey}" 未定义任何支持城市`);
+  // 去重（避免重复请求同一城市）
+  const seen=new Set(); list=list.filter(n=>{const k=norm(n); if(seen.has(k)) return false; seen.add(k); return true;});
+  return {stateKey,cities:list};
+}
+async function geocodeCities(cities, stateRaw, originLon, originLat){
+  const origin={lon:originLon,lat:originLat};
+  const tasks=cities.map(name=>async()=>geocodeCityStrict(name, stateRaw, origin));
+  // 使用 geocodeLimiter 的内部节流，外部仍做轻量并发控制以利进度
+  const out=[]; let i=0,active=0,done=0; const MAX_OUTER_CONC=Math.min(GEOCODE_CONCURRENCY*2, 10);
+  return new Promise(resolve=>{
+    function next(){
+      while(active<MAX_OUTER_CONC && i<tasks.length){
+        const idx=i++; active++;
+        tasks[idx]().then(r=>{out[idx]=r; active--; done++; if(done===tasks.length) resolve(out); else next();})
+                    .catch(()=>{out[idx]={city:cities[idx],ok:false}; active--; done++; next();});
+      }
+      if(i>=tasks.length && active===0) resolve(out);
+    }
+    next();
+  }).then(arr=>arr.filter(x=>x?.ok));
+}
+
+/* ========= Matrix（带限流/退避） ========= */
+async function matrixFromOrigin(origin,dests){
+  const chunksArr=chunk(dests,24), all=[];
+  for(const batch of chunksArr){
+    const coords=[[origin.lon,origin.lat],...batch.map(d=>[d.lon,d.lat])].map(([x,y])=>`${x},${y}`).join(';');
+    const destIdx=batch.map((_,i)=>i+1).join(';');
+    const url=`https://api.mapbox.com/directions-matrix/v1/mapbox/driving/${coords}?annotations=distance,duration&sources=0&destinations=${destIdx}&access_token=${MAPBOX_TOKEN}`;
+    const resp=await mapboxFetch(url,'matrix');
+    if(!resp.ok){ all.push(...batch.map(d=>({city:d.city,lon:d.lon,lat:d.lat,distanceVal:Infinity,distance:'—',duration:'—'}))); continue; }
+    const data=await resp.json(); const distances=data?.distances?.[0]||[]; const durations=data?.durations?.[0]||[];
+    batch.forEach((d,i)=>{ const dist=distances[i], dur=durations[i];
+      if(Number.isFinite(dist)&&Number.isFinite(dur)) all.push({city:d.city,lon:d.lon,lat:d.lat,distanceVal:dist,distance:fmtDist(dist),duration:fmtDur(dur)});
+      else all.push({city:d.city,lon:d.lon,lat:d.lat,distanceVal:Infinity,distance:'—',duration:'—'});
+    });
+  }
+  return all;
+}
+
+/* ========= 批处理执行（用于显示进度） ========= */
+function runPool(tasks,limit,onProgress){
+  let i=0,active=0,done=0,out=[];
+  return new Promise(resolve=>{
+    function next(){
+      while(active<limit && i<tasks.length){
+        const idx=i++; active++;
+        tasks[idx]().then(r=>{out[idx]=r; active--; done++; onProgress?.(done,tasks.length); if(done===tasks.length) resolve(out.flat()); else next();})
+                    .catch(()=>{out[idx]=[]; active--; done++; onProgress?.(done,tasks.length); next();});
+      }
+    }
+    next();
+  });
+}
+
+/* ========= 查询主流程（无“导航”列） ========= */
+searchButton.onclick = async function(){
+  errorEl.textContent=''; errorEl.style.display='none';
+  resultsEl.innerHTML=''; loadingEl.style.display='block';
+  progressContainer.style.display='none'; progressBar.style.width='0%'; progressText.textContent='';
+
+  try{
+    const input=document.getElementById('addressInput').value.trim();
+    if(!input) throw new Error('请输入地址');
+    hist.add(input);
+
+    // 1) 地址 → 州/坐标
+    const {lon,lat,stateRaw}=await geocodeAddress(input);
+    const origin={lon,lat};
+
+    // 2) 州 → 支持城市（去重）
+    const {cities}=await getCitiesInState(stateRaw);
+
+    // 3) 城市严格 geocode（受限流器调度），并发适中 + 进度
+    progressContainer.style.display='block';
+    progressText.textContent=`阶段 1：解析 "${stateRaw}" 州内 ${cities.length} 个支持城市…`;
+    const cityGeo=await geocodeCities(cities, stateRaw, origin.lon, origin.lat);
+    if(!cityGeo.length) throw new Error(`未能解析 "${stateRaw}" 州内支持城市坐标`);
+
+    // 4) Matrix 批量距离/时间（每批 ≤24，受 matrix 限流器保护）
+    const batches=chunk(cityGeo, BATCH_SIZE-1);
+    const tasks=batches.map(b=>()=>matrixFromOrigin(origin,b));
+    const results=await runPool(tasks, Math.min(MATRIX_CONCURRENCY, tasks.length), (f,t)=>{
+      const p=Math.round(f/t*100); progressBar.style.width=p+'%'; progressText.textContent=`阶段 2：批量计算距离/时间… ${p}%`;
+    });
+
+    // 5) 排序并渲染（英里/分钟）
+    results.sort((a,b)=>a.distanceVal-b.distanceVal);
+    const rows=results.map(r=>`<tr><td><strong>${r.city}</strong></td><td>${r.distance}</td><td>${r.duration}</td></tr>`).join('');
+    resultsEl.innerHTML=`<table><thead><tr><th>🏙️ 城市</th><th>📏 距离（英里）</th><th>⏱️ 驾车时间（分钟）</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+    loadingEl.textContent='计算完成'; setTimeout(()=>{loadingEl.style.display='none';},1500);
+    progressText.textContent='✅ 完成';
+  }catch(e){
+    loadingEl.style.display='none';
+    errorEl.style.display='block';
+    errorEl.textContent=e.message||'发生错误';
+  }finally{
+    setTimeout(()=>{progressContainer.style.display='none';progressText.textContent='';},1200);
+  }
+};
+
+/* 回车快捷键 */
+document.getElementById('addressInput').addEventListener('keypress',e=>{ if(e.key==='Enter') searchButton.click(); });
+</script>
+</body>
+</html>
